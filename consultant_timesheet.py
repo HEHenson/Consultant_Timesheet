@@ -1,11 +1,18 @@
-# Version 0.1 to be loaded onto GitHub
+# Version 0.2 to be loaded onto GitHub
 
 import datetime
+import unittest
+import pycountry
 
 
 
 class day():
-    def __init__(self,theday,themonth,theyear,higherpriority=None):
+    """
+    The day stores information relevant to the project to determine if 
+    it is a potential day of work.  It is not tied to the individual but 
+    it is tied to the project and its jurisdiction
+    """
+    def __init__(self,theday=None,themonth=None,theyear=None,higherpriority=None):
         self.day = theday
         self.month = themonth
         self.year = theyear
@@ -16,9 +23,11 @@ class day():
             self.exists = False
         self.after = None
         self.before = None
-    def isday(self,theday):
-        """ return true if self equals the day of week"""
-        """ Monday equals zero"""
+    def isworkday(self,theday):
+        """  determine if theday is a normal working day
+             args theday: int (monday = 0)
+             return boolean
+        """
         if not self.exists :
             return False
         if self.thedate.weekday() == theday :
@@ -31,6 +40,10 @@ class day():
         else:
             return None
     def isstat(self,jurisdiction="Ont"):
+        """
+        Determines if current day is a statutory holiday
+        
+        """
         retval = False
         try:
             theday = datetime.date(self.year,self.month,self.day).weekday()
@@ -38,22 +51,25 @@ class day():
             return False
         if theday == 5 or theday == 6 :
             return True
+        if(self.isBox()): return True
+        if(self.isXmas()): return True
+        if(self.isRembrance(jurisdiction)) : return True
         if(self.isgoodfriday(jurisdiction)) : return True
         if(self.isJeanB(jurisdiction)) : return True
         if(self.islabour()) : return True
         return retval
     def isgoodfriday(self,jurisdiction):
         if (datetime.date(2016,3,25) == datetime.date(self.year,self.month,self.day)
-            and jurisdiction == "Que"): return True
+            and jurisdiction == "QC"): return True
     def isestMon(self,jurisdiction):
         if (datetime.date(2016,3,28) == datetime.date(self.year,self.month,self.day)
-            and jurisdiction == "Que"): return True
+            and jurisdiction == "QC"): return True
     def isJeanB(self,jurisdiction):
         if (datetime.date(2016,6,24) == datetime.date(self.year,self.month,self.day)
-            and jurisdiction == "Que"): return True
+            and jurisdiction == "QC"): return True
     def isVicDay(self,jurisdiction):
         if (datetime.date(2016,5,23) == datetime.date(self.year,self.month,self.day)
-            and jurisdiction == "Que"): return True 
+            and jurisdiction == "QC"): return True 
     def islabour(self):
         if (datetime.date(2016,9,5) == datetime.date(self.year,self.month,self.day)):
             return True
@@ -63,16 +79,32 @@ class day():
     def isTGving(self):
         if (datetime.date(2016,10,10) == datetime.date(self.year,self.month,self.day)):
             return True
-    def isRembrance(self):
+        if (datetime.date(2020,12,10) == datetime.date(self.year,self.month,self.day)):
+            return True
+    def isRembrance(self,jurisdiction):
+        if jurisdiction == 'QC':
+            return False
         if (datetime.date(2016,11,11) == datetime.date(self.year,self.month,self.day)):
             return True
-    def isXmas(self):
-        if (datetime.date(2016,12,25) == datetime.date(self.year,self.month,self.day)):
+        if (datetime.date(2020,11,11) == datetime.date(self.year,self.month,self.day)):
             return True
+    def isXmas(self):
+        if (self.month == 12 and self.day == 25 ):
+            return True
+    def isBox(self):
+        # in Ontario if the 26 is a holiday then it is the Monday
+        if self.year == 2020: 
+            if self.month == 12 and self.day == 28 : 
+                return True
+            else:
+                return False
+        if (self.month == 12 and self.day == 26 ):
+            return True
+        return False
     def hasconflict(self,highpriority = None):
         if(highpriority == None) :
             return False
-        retval = highpriority.isavail(self.year,self.month,self.day)
+        retval = self.isavail(self.month,self.day,self.year)
         if retval == True :
             return False
         else:
@@ -82,8 +114,66 @@ class day():
     
 
 class person():
-    def __init__(self,pname):
+    """
+    Info tied to participant in the project
+    """
+    def __init__(self,pname,maxwk=5,dayoff=None):
         self.thename = pname
+        #: maxwk maximum days of work in week
+        self.maxwk = maxwk
+        #: dayoff Monday = zero
+        self.dayoff = dayoff
+        #: days worked on project by participant
+        self.daytot = 0
+        #: days worked in current week
+        self.curwk = 0
+        
+    def isavail(self,month,day,year):
+        """
+        Will check against personal holidays
+        """
+        print(f'*** 135 {month} {day} {year}')
+        if self.isholiday(month,day,year):
+            return False
+        if self.isdayoff(month,day,year):
+            return False
+        return True
+    
+    def isdayoff(self,month,day,year):
+        
+        try:
+            theday = datetime.date(year,month,day)
+        except ValueError:
+            return False
+        if self.dayoff is not None:
+            if self.dayoff == theday:
+                return True
+        if theday.weekday() >= self.maxwk:
+            return True
+        return False
+        
+    def isholiday(self,month,day,year):
+        """
+        Checks for person holidays
+        returns True if this is a holiday
+        
+        """
+        # check for day off during week
+        print(f'*** 158 month={month} day={day} year={year}')
+        try:
+            theday = datetime.date(year,month,day)
+        except ValueError:
+            return False
+        print(f'*** 160 theday={theday}')
+        daynum = theday.weekday()
+        print(f'*** 162 daynum = {daynum}')
+        if daynum < (self.maxwk):
+            print(f'***  164 in holiday theday {theday}')
+            return False
+        else:
+            print(f'***  167 in holiday theday {theday} max={self.maxwk}')
+            return True
+            
     def getname(self):
         return self.thename
     def __repr__(self):
@@ -96,23 +186,24 @@ class workday(day):
         day.__init__(self,theday, themonth,theyear)
         self.worker = theperson
         self.comment = comment
-        # check if holiday
-        a_holiday = self.isstat("Que")
     def __repr__(self):
         return "A day of work by "+ self.worker.getname()
 
 class project():
-    def __init__(self,projname,HigherPriority = None):
+    def __init__(self,projname,HigherPriority = None,maxworkwk=5,jur='ON'):
         """creates a project object"""
         self.projname = projname
+        # dictionary of days worked on project
         self.daydict = []
         self.daynum = 0
         # this represents another project that claims priority
         # over any given day
         self.higherPriority = HigherPriority
         self.listsorted = False
+        self.maxworkwk = maxworkwk
         self.firstday = None
         self.lastday = None
+        self.jur = jur
     def __repr__(self):
         return "Project "+ self.projnam 
 
@@ -124,7 +215,9 @@ class project():
         # or does not exist
         newday = workday(theperson,theday,themon,theyear,comment)
         # if day is a holiday do not add into list
-        if newday.isstat("Que") :
+        if newday.isstat(self.jur) :
+            return False
+        if theperson.isavail(themon,theday,theyear) == False:
             return False
         if newday.hasconflict(self.higherPriority) :
             return False
@@ -170,7 +263,10 @@ class project():
             else :
                 theday = theday.after
 
-    def isavail(self,theyear,themonth,theday):
+    def isprojday(self,themonth,theday,theyear):
+        """
+        Work being done on project that day
+        """
         retval = True
         
         for personday in self.daydict :
@@ -220,7 +316,7 @@ class project():
         initday = theday
         for monthcnt in range(themonth,13):
             for daycnt in range(initday,32):
-                isadded = self.add_day(me,daycnt,monthcnt,2016)
+                isadded = self.add_day(me,daycnt,monthcnt,theyear)
                 if isadded : daynum += 1
                 if daynum >= maxdays : return daynum
             # want to start at day one for next month
@@ -235,10 +331,10 @@ class project():
         initday = theday
         for monthcnt in range(themonth,13):
             for daycnt in range(initday,32):
-                newday = day(daycnt,monthcnt,2016)
-                if not newday.isday(dayofweek):
+                newday = day(daycnt,monthcnt,theyear)
+                if not newday.isworkday(dayofweek):
                     continue
-                isadded = self.add_day(me,daycnt,monthcnt,2016,comment)
+                isadded = self.add_day(me,daycnt,monthcnt,theyear,comment)
                 if isadded : daynum += 1
                 if daynum >= maxdays : return daynum
             # want to start at day one for next month
@@ -250,7 +346,7 @@ class project():
 def loaddata():
     me = person('Harold Henson')
     Vac2016 = project('Vacation for HH')
-    
+    Vac2020 = project('Vacation for HH')
     
     for daynum in range(10,16) :
         Vac2016.add_day(me,daynum,2,2016,"Cottage")
@@ -275,6 +371,7 @@ def loaddata():
         Vac2016.add_day(me,daynum,9,2016,"Cottage")
     # now take every Friday off
     Vac2016.addweekday(me,50,1,1,2016,4,"Fridays off")
+    Vac2020.addweekday(me,50,1,1,2020,4,"Fridays off")
 
     Vac2016.listdays()
     thetot = Vac2016.get_total()
@@ -286,5 +383,47 @@ def loaddata():
     ESDC2016.listdays()
     thetot = ESDC2016.get_total()
     print("Total Days Used", thetot)
+
+class Test(unittest.TestCase):        
+    def test_person(self):
+        print('\n','test_person_started','\n',40*'*')
+        MrX = person('MrX')
+        self.assertEqual(MrX.getname(),'MrX')
+        self.assertEqual(MrX.maxwk,5)
+        MrY= person('MrY',maxwk=4)
+        self.assertEqual(MrY.maxwk,4)
+        self.assertTrue(MrY.isavail(10,13,2020))
+        self.assertTrue(MrY.isavail(10,15,2020))
+        self.assertFalse(MrY.isavail(10,16,2020))
+        print('\n','test_person_ended','\n',40*'*')
+    def test_day(self):
+        print('\n','test_day_started','\n',40*'*')
+        XmasGen = day(theday=25,themonth=12)
+        self.assertEqual(XmasGen.isXmas() ,True)
+        XboxGen = day(theday=26,themonth=12)
+        self.assertEqual(XboxGen.isBox() ,True)
+        Xbox2020A = day(theday=26,themonth=12,theyear=2020)
+        self.assertEqual(Xbox2020A.isBox() ,False)
+        Xbox2020B = day(theday=28,themonth=12,theyear=2020)
+        self.assertEqual(Xbox2020B.isBox() ,True)
+        # check standard workweek in 2020
+        
+
+        print('\n','test_day_ended','\n',40*'*')  
+    def test_Example1(self):
+        print('\n','test_Example1_started','\n',40*'*')
+        TB_Cas90 = person('Harold Henson',maxwk=4)
+        TB_ECode = project('2020_TB_Ecode')
+        TB_ECode.loaddays(TB_Cas90,90,2020,10,13)
+        print(TB_ECode.listdays())
+        print('\n','test_Example1_ended','\n',40*'*') 
+        
+        
+        
+        
+        
+        
+if __name__ == '__main__':
+    unittest.main()  
     
         
